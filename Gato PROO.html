@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Gato ULTRA PRO</title>
+<style>
+body { font-family: Arial; text-align: center; background: #222; color: white; }
+
+#tablero {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    gap: 5px;
+    justify-content: center;
+    margin: 20px auto;
+}
+
+.celda {
+    width: 100px;
+    height: 100px;
+    background: #444;
+    font-size: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.celda:hover { background: #666; }
+
+button { padding: 10px; margin: 10px; }
+
+/* Pantalla final */
+#pantallaFinal {
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background: rgba(0,0,0,0.9);
+    color:white;
+    font-size:30px;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+}
+</style>
+</head>
+<body>
+
+<h1>🎮 Gato PRO💪🏼😼</h1>
+
+<p>❤️ Tú: <span id="vidasJugador">3</span> | 🤖 IA: <span id="vidasMaquina">3</span></p>
+
+<div id="tablero"></div>
+
+<button onclick="usarPoder()">💣 Usar poder</button>
+<button onclick="reiniciar()">🔄 Reiniciar ronda</button>
+<button onclick="reiniciarTodo()">🆕 Reiniciar TODO</button>
+
+<p id="mensaje"></p>
+
+<!-- Pantalla final -->
+<div id="pantallaFinal">
+    <h1 id="textoFinal"></h1>
+    <button onclick="reiniciarTodo()">🔄 Jugar otra vez</button>
+</div>
+
+<!-- SONIDOS -->
+<audio id="click" src="https://www.soundjay.com/button/button-3.mp3"></audio>
+<audio id="ia" src="https://www.soundjay.com/button/button-10.mp3"></audio>
+<audio id="poder" src="https://www.soundjay.com/explosion/explosion-01.mp3"></audio>
+<audio id="ganar" src="https://www.soundjay.com/human/applause-8.mp3"></audio>
+<audio id="perder" src="https://www.soundjay.com/button/button-2.mp3"></audio>
+
+<!-- MUSICA -->
+<audio id="musicaFondo" src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" loop></audio>
+
+<script>
+
+let tablero = ["", "", "", "", "", "", "", "", ""];
+let turno = "X";
+let vidasJugador = 3;
+let vidasMaquina = 3;
+let poderJugador = false;
+let poderIA = false;
+let sonidoActivado = false;
+
+const frasesJugador = ["😎 Buena jugada","🔥 Vas fuerte","🎯 Preciso","👀 Interesante...","💥 Ataque perfecto"];
+const frasesIA = ["🤖 Calculando...","😏 No tan rápido","⚡ Movimiento óptimo","🧠 Estrategia activada","💀 Te tengo"];
+
+const tableroHTML = document.getElementById("tablero");
+const mensaje = document.getElementById("mensaje");
+
+function sonido(id){
+    if(!sonidoActivado) return;
+    let audio = document.getElementById(id);
+    audio.currentTime = 0;
+    audio.play().catch(()=>{});
+}
+
+function iniciarMusica(){
+    if(!sonidoActivado) return;
+    let musica = document.getElementById("musicaFondo");
+    musica.volume = 0.2;
+    musica.play().catch(()=>{});
+}
+
+function dibujar(){
+    tableroHTML.innerHTML = "";
+    tablero.forEach((celda,i)=>{
+        const div = document.createElement("div");
+        div.classList.add("celda");
+        div.innerText = celda;
+        div.onclick = ()=> jugar(i);
+        tableroHTML.appendChild(div);
+    });
+}
+
+function fraseRandom(lista){
+    return lista[Math.floor(Math.random()*lista.length)];
+}
+
+function jugar(i){
+
+    if(!sonidoActivado){
+        sonidoActivado = true;
+        iniciarMusica();
+    }
+
+    if(tablero[i] !== "" || turno !== "X") return;
+
+    sonido("click");
+
+    tablero[i] = "X";
+    mensaje.innerText = fraseRandom(frasesJugador);
+    turno = "O";
+    dibujar();
+
+    if(verificar("X")){
+        vidasMaquina--;
+        actualizar();
+        if(vidasMaquina > 0){
+            mensaje.innerText = "🏆 Ganaste la ronda";
+            setTimeout(reiniciar,1000);
+        }
+        return;
+    }
+
+    setTimeout(jugadaIA,700);
+}
+
+function jugadaIA(){
+
+    if(!poderIA && Math.random() < 0.3){
+        usarPoderIA();
+        return;
+    }
+
+    let mov = mejorMovimiento();
+    tablero[mov] = "O";
+
+    sonido("ia");
+
+    mensaje.innerText = fraseRandom(frasesIA);
+    turno = "X";
+    dibujar();
+
+    if(verificar("O")){
+        vidasJugador--;
+        actualizar();
+        if(vidasJugador > 0){
+            mensaje.innerText = "💀 La IA ganó la ronda";
+            setTimeout(reiniciar,1000);
+        }
+    }
+}
+
+function usarPoder(){
+    if(poderJugador){
+        mensaje.innerText = "Ya usaste tu poder 😅";
+        return;
+    }
+
+    let indices = tablero.map((v,i)=> v==="O"?i:null).filter(v=>v!==null);
+
+    if(indices.length===0){
+        mensaje.innerText="No hay nada que borrar";
+        return;
+    }
+
+    sonido("poder");
+
+    let borrar = indices[Math.floor(Math.random()*indices.length)];
+    tablero[borrar] = "";
+    poderJugador = true;
+    dibujar();
+    mensaje.innerText="💣 Eliminaste una jugada de la IA";
+}
+
+function usarPoderIA(){
+    let indices = tablero.map((v,i)=> v==="X"?i:null).filter(v=>v!==null);
+
+    if(indices.length===0){
+        jugadaIA();
+        return;
+    }
+
+    sonido("poder");
+
+    let borrar = indices[Math.floor(Math.random()*indices.length)];
+    tablero[borrar] = "";
+    poderIA = true;
+    dibujar();
+    mensaje.innerText="🤖 La IA borró tu jugada 😱";
+
+    setTimeout(jugadaIA,500);
+}
+
+function mejorMovimiento(){
+    for(let i=0;i<9;i++){
+        if(tablero[i]===""){
+            tablero[i]="O";
+            if(verificar("O")){
+                tablero[i]="";
+                return i;
+            }
+            tablero[i]="";
+        }
+    }
+
+    for(let i=0;i<9;i++){
+        if(tablero[i]===""){
+            tablero[i]="X";
+            if(verificar("X")){
+                tablero[i]="";
+                return i;
+            }
+            tablero[i]="";
+        }
+    }
+
+    let vacios = tablero.map((v,i)=> v===""?i:null).filter(v=>v!==null);
+    return vacios[Math.floor(Math.random()*vacios.length)];
+}
+
+function verificar(jugador){
+    const combos=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    return combos.some(c=>c.every(i=>tablero[i]===jugador));
+}
+
+function actualizar(){
+    document.getElementById("vidasJugador").innerText = vidasJugador;
+    document.getElementById("vidasMaquina").innerText = vidasMaquina;
+
+    if(vidasJugador===0){
+        sonido("perder");
+        mostrarFinal("💀 LA IA GANÓ EL JUEGO");
+    }
+
+    if(vidasMaquina===0){
+        sonido("ganar");
+        mostrarFinal("🏆 ¡ERES EL CAMPEÓN!");
+    }
+}
+
+function mostrarFinal(texto){
+    document.getElementById("pantallaFinal").style.display="flex";
+    document.getElementById("textoFinal").innerText=texto;
+    desactivarTablero();
+}
+
+function desactivarTablero(){
+    document.querySelectorAll(".celda").forEach(c=>c.onclick=null);
+}
+
+function reiniciar(){
+    tablero=["","","","","","","","",""];
+    poderJugador=false;
+    poderIA=false;
+    turno="X";
+    mensaje.innerText="";
+    dibujar();
+}
+
+function reiniciarTodo(){
+    tablero=["","","","","","","","",""];
+    vidasJugador=3;
+    vidasMaquina=3;
+    poderJugador=false;
+    poderIA=false;
+    turno="X";
+
+    document.getElementById("vidasJugador").innerText=vidasJugador;
+    document.getElementById("vidasMaquina").innerText=vidasMaquina;
+
+    document.getElementById("pantallaFinal").style.display="none";
+    mensaje.innerText="";
+
+    dibujar();
+}
+
+dibujar();
+
+</script>
+
+</body>
+</html>
